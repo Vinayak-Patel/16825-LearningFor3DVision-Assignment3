@@ -35,6 +35,7 @@ from dataset import (
     trivial_collate,
 )
 
+from implicit import HierarchicalNeRF
 
 # Model class containing:
 #   1) Implicit volume defining the scene
@@ -98,18 +99,27 @@ def render_images(
 
         # TODO (Q1.3): Visualize xy grid using vis_grid
         if cam_idx == 0 and file_prefix == '':
-            pass
+            xy_vis = vis_grid(xy_grid, image_size)
+            plt.imsave('images/xy_grid.png', xy_vis)
+            print("Saved xy_grid visualization to images/xy_grid.png")
 
         # TODO (Q1.3): Visualize rays using vis_rays
         if cam_idx == 0 and file_prefix == '':
-            pass
+            rays_vis = vis_rays(ray_bundle, image_size)
+            plt.imsave('images/rays.png', rays_vis)
+            print("Saved rays visualization to images/rays.png")
         
         # TODO (Q1.4): Implement point sampling along rays in sampler.py
-        pass
 
         # TODO (Q1.4): Visualize sample points as point cloud
         if cam_idx == 0 and file_prefix == '':
-            pass
+            sampled_ray_bundle = model.sampler(ray_bundle)
+            points = sampled_ray_bundle.sample_points
+            points_subset = points[::10].reshape(-1,3).unsqueeze(0).to(device)
+            from render_functions import render_points
+            render_points('images/sampled_points.png', points_subset, image_size=256, color=[0.0, 0.5, 1.0], device=device)
+    
+            print("Saved sampled points visualization to images/sampled_points.png")
 
         # TODO (Q1.5): Implement rendering in renderer.py
         out = model(ray_bundle)
@@ -124,15 +134,17 @@ def render_images(
 
         # TODO (Q1.5): Visualize depth
         if cam_idx == 2 and file_prefix == '':
-            pass
-
+            depth_vis = out['depth'].view(image_size[1], image_size[0], 1).repeat(1, 1, 3)
+            depth_vis = (depth_vis - depth_vis.min()) / (depth_vis.max() - depth_vis.min() + 1e-8)
+            depth_vis = np.array(depth_vis.detach().cpu())
+            plt.imsave('images/depth.png', depth_vis)
         # Save
         if save:
             plt.imsave(
                 f'{file_prefix}_{cam_idx}.png',
                 image
             )
-    
+        print("Saved depth visualization to images/depth.png")
     return all_images
 
 
@@ -200,7 +212,7 @@ def train(
             out = model(ray_bundle)
 
             # TODO (Q2.2): Calculate loss
-            loss = None
+            loss = torch.nn.functional.mse_loss(out['feature'], rgb_gt)
 
             # Backprop
             optimizer.zero_grad()
@@ -246,7 +258,7 @@ def create_model(cfg):
         os.makedirs(checkpoint_dir, exist_ok=True)
 
         # Resume training if requested.
-        if cfg.training.resume and os.path.isfile(checkpoint_path):
+        if cfg.training.resume and os.path.isfile(checkpoint_path) and not cfg.training.fresh_start:
             print(f"Resuming from checkpoint {checkpoint_path}.")
             loaded_data = torch.load(checkpoint_path)
             model.load_state_dict(loaded_data["model"])
@@ -283,7 +295,16 @@ def train_nerf(
 ):
     # Create model
     model, optimizer, lr_scheduler, start_epoch, checkpoint_path = create_model(cfg)
-
+    model = HierarchicalNeRF(cfg)
+    model.cuda(); model.train()
+    
+    
+    # Initialize optimizer for both models
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=cfg.training.lr,
+    )
+    
     # Load the training/validation data.
     train_dataset, val_dataset, _ = get_nerf_datasets(
         dataset_name=cfg.data.dataset_name,
@@ -317,10 +338,16 @@ def train_nerf(
             rgb_gt = sample_images_at_xy(image, xy_grid)
 
             # Run model forward
-            out = model(ray_bundle)
+            # out = model(ray_bundle)
+            coarse_output = model.forward_coarse(ray_bundle)
+            fine_output = model(ray_bundle)
 
             # TODO (Q3.1): Calculate loss
-            loss = None
+            # loss = torch.nn.functional.mse_loss(out['feature'], rgb_gt)
+            coarse_loss = torch.nn.functional.mse_loss(coarse_output['feature'], rgb_gt)
+            fine_loss = torch.nn.functional.mse_loss(fine_output['feature'], rgb_gt)
+            
+            loss = 0.1 * coarse_loss + 1.0 * fine_loss
 
             # Take the training step.
             optimizer.zero_grad()
@@ -359,7 +386,140 @@ def train_nerf(
                     model, create_surround_cameras(4.0, n_poses=20, up=(0.0, 0.0, 1.0), focal_length=2.0),
                     cfg.data.image_size, file_prefix='nerf'
                 )
-                imageio.mimsave('images/part_3.gif', [np.uint8(im * 255) for im in test_images], loop=0)
+                imageio.mimsave('images/part_4_2.gif', [np.uint8(im * 255) for im in test_images], loop=0)
+                
+
+def train_nerf_reduced(
+    cfg
+):
+    os.makedirs("checkpoints", exist_ok=True)
+    os.makedirs("images/part_8_2", exist_ok=True)
+    
+    from implicit import HierarchicalNeRF
+    model = HierarchicalNeRF(cfg)
+    model.cuda()
+    model.train()
+    
+    optimizer_state_dict = None
+    start_epoch = 0
+
+    checkpoint_path = os.path.join(
+        hydra.utils.get_original_cwd(),
+        cfg.training.checkpoint_path
+    )
+
+    if len(cfg.training.checkpoint_path) > 0:
+        checkpoint_dir = os.path.dirname(checkpoint_path)
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+        if cfg.training.resume and os.path.isfile(checkpoint_path) and not cfg.training.fresh_start:
+            print(f"Resuming from checkpoint {checkpoint_path}.")
+            loaded_data = torch.load(checkpoint_path)
+            model.load_state_dict(loaded_data["model"])
+            start_epoch = loaded_data["epoch"]
+            optimizer_state_dict = loaded_data["optimizer"]
+            print(f"   => resuming from epoch {start_epoch}.")
+    
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=cfg.training.lr,
+    )
+    
+    if optimizer_state_dict is not None:
+        optimizer.load_state_dict(optimizer_state_dict)
+        optimizer.last_epoch = start_epoch
+
+    def lr_lambda(epoch):
+        return cfg.training.lr_scheduler_gamma ** (
+            epoch / cfg.training.lr_scheduler_step_size
+        )
+
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, lr_lambda, last_epoch=start_epoch - 1, verbose=False
+    )
+    
+    from dataset import get_nerf_datasets_subset
+    
+    train_dataset, val_dataset, _ = get_nerf_datasets_subset(
+        dataset_name=cfg.data.dataset_name,
+        image_size=[cfg.data.image_size[1], cfg.data.image_size[0]],
+        num_views=cfg.data.num_views,
+    )
+
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=0,
+        collate_fn=trivial_collate,
+    )
+
+    for epoch in range(start_epoch, cfg.training.num_epochs):
+        t_range = tqdm.tqdm(enumerate(train_dataloader))
+
+        for iteration, batch in t_range:
+            image, camera, camera_idx = batch[0].values()
+            image = image.cuda().unsqueeze(0)
+            camera = camera.cuda()
+
+            xy_grid = get_random_pixels_from_image(
+                cfg.training.batch_size, cfg.data.image_size, camera
+            )
+            ray_bundle = get_rays_from_pixels(
+                xy_grid, cfg.data.image_size, camera
+            )
+            rgb_gt = sample_images_at_xy(image, xy_grid)
+
+            coarse_output = model.forward_coarse(ray_bundle)
+            fine_output = model(ray_bundle)
+
+            coarse_loss = torch.nn.functional.mse_loss(coarse_output['feature'], rgb_gt)
+            fine_loss = torch.nn.functional.mse_loss(fine_output['feature'], rgb_gt)
+            
+            loss = 0.1 * coarse_loss + 1.0 * fine_loss
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            t_range.set_description(f'Epoch: {epoch:04d}, Loss: {loss:.06f}')
+            t_range.refresh()
+
+        lr_scheduler.step()
+
+        if (
+            epoch % cfg.training.checkpoint_interval == 0
+            and len(cfg.training.checkpoint_path) > 0
+            and epoch > 0
+        ):
+            print(f"Storing checkpoint {checkpoint_path}.")
+            
+            checkpoint_dir = os.path.dirname(checkpoint_path)
+            os.makedirs(checkpoint_dir, exist_ok=True)
+
+            data_to_store = {
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "epoch": epoch,
+            }
+
+            torch.save(data_to_store, checkpoint_path)
+
+        if (
+            epoch % cfg.training.render_interval == 0
+            and epoch > 0
+        ):
+            os.makedirs("images/part_8_2", exist_ok=True)
+            
+            file_prefix = os.path.normpath("images/part_8_2/nerf_reduced")
+            gif_path = os.path.normpath("images/part_8_2/nerf.gif")
+            
+            with torch.no_grad():
+                test_images = render_images(
+                    model, create_surround_cameras(4.0, n_poses=20, up=(0.0, 0.0, 1.0), focal_length=2.0),
+                    cfg.data.image_size, file_prefix=file_prefix
+                )
+                imageio.mimsave(gif_path, [np.uint8(im * 255) for im in test_images], loop=0)
 
 
 @hydra.main(config_path='./configs', config_name='sphere')
@@ -372,6 +532,8 @@ def main(cfg: DictConfig):
         train(cfg)
     elif cfg.type == 'train_nerf':
         train_nerf(cfg)
+    elif cfg.type == 'train_nerf_reduced':
+        train_nerf_reduced(cfg)
 
 
 if __name__ == "__main__":

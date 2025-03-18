@@ -169,4 +169,41 @@ def download_data(
             with open(local_fl, "wb") as f:
                 f.write(r.content)
 
+def get_nerf_datasets_subset(
+    dataset_name,
+    image_size,
+    num_views=20,
+    seed=42
+):
+    import random
+    
+    train_dataset, val_dataset, test_dataset = get_nerf_datasets(
+        dataset_name=dataset_name,
+        image_size=image_size,
+    )
+    
+    random.seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    
+    total_views = len(train_dataset)
+    print(f"Total training views: {total_views}")
+    
+    if num_views >= total_views:
+        print(f"Warning: requested {num_views} views but dataset only has {total_views} views")
+        subset_indices = list(range(total_views))
+    else:
+        subset_indices = random.sample(range(total_views), num_views)
+        subset_indices.sort()  # Sort for consistency
+    
+    print(f"Using {len(subset_indices)} training views: {subset_indices}")
+    
+    train_dataset_subset = torch.utils.data.Subset(train_dataset, subset_indices)
+    
+    print(f"Saving training view indices to training_views_used.txt")
+    with open('training_views_used.txt', 'w') as f:
+        for idx in subset_indices:
+            f.write(f"{idx}\n")
+    
+    return train_dataset_subset, val_dataset, test_dataset
 

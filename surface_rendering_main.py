@@ -141,13 +141,30 @@ def render(
     # Create model
     model = Model(cfg)
     model = model.cuda(); model.eval()
-
+    
+    if hasattr(cfg, 'output_name') and cfg.output_name:
+        output_name = cfg.output_name
+    elif cfg.sdf.type == 'scene':  # Check if this is the complex scene from part 8.1
+        output_name = "part_8_1"
+    else:
+        output_name = "part_5"
+    
+    print(f"Rendering for {output_name}...")
+    
     # Render spiral
-    cameras = create_surround_cameras(3.0, n_poses=20, up=(0.0, 0.0, 1.0))
+    cameras = create_surround_cameras(10, n_poses=20, up=(0.0, 1.0, 0.0), focal_length=2.0)
     all_images = render_images(
-        model, cameras, cfg.data.image_size
+        model, cameras, cfg.data.image_size, save=True, file_prefix=f'images/{output_name}'
     )
-    imageio.mimsave('images/part_5.gif', [np.uint8(im * 255) for im in all_images],loop=0)
+    # imageio.mimsave('images/part_5.gif', [np.uint8(im * 255) for im in all_images],loop=0)
+    
+    output_gif = f'images/{output_name}.gif'
+    print(f"Saving GIF to {output_gif}")
+    imageio.mimsave(output_gif, [np.uint8(im * 255) for im in all_images], loop=0)
+    
+    print(f"Rendering complete. GIF saved to {output_gif}")
+    
+
 
 
 def create_model(cfg):
@@ -233,8 +250,9 @@ def train_points(
 
             # Get distances and enforce point cloud loss
             distances, gradients = model.implicit_fn.get_distance_and_gradient(points)
-            loss = None # TODO (Q6): Point cloud SDF loss on distances
-            point_loss = loss
+            point_loss = torch.mean(torch.abs(distances))
+            loss = point_loss.clone() # TODO (Q6): Point cloud SDF loss on distances
+            # point_loss = loss
 
             # Sample random points in bounding box
             eikonal_points = get_random_points(
@@ -243,7 +261,9 @@ def train_points(
 
             # Get sdf gradients and enforce eikonal loss
             eikonal_distances, eikonal_gradients = model.implicit_fn.get_distance_and_gradient(eikonal_points)
-            loss += torch.exp(-1e2 * torch.abs(eikonal_distances)).mean() * cfg.training.inter_weight
+            
+            if eikonal_distances is not None and eikonal_gradients is not None:
+              loss += torch.exp(-1e2 * torch.abs(eikonal_distances)).mean() * cfg.training.inter_weight
             loss += eikonal_loss(eikonal_gradients) * cfg.training.eikonal_weight # TODO (Q6): Implement eikonal loss
 
             # Take the training step.
@@ -416,6 +436,104 @@ def train_images(
             except Exception as e:
                 print("Empty mesh")
                 pass
+            
+
+def train_images_reduced(
+    cfg
+):
+    model, optimizer, lr_scheduler, start_epoch, checkpoint_path = create_model(cfg)
+
+    from dataset import get_nerf_datasets_subset
+    
+    train_dataset, val_dataset, _ = get_nerf_datasets_subset(
+        dataset_name=cfg.data.dataset_name,
+        image_size=[cfg.data.image_size[1], cfg.data.image_size[0]],
+        num_views=cfg.data.num_views,
+    )
+
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=0,
+        collate_fn=lambda batch: batch,
+    )
+
+    pretrain_sdf(cfg, model)
+
+    for epoch in range(start_epoch, cfg.training.num_epochs):
+        t_range = tqdm.tqdm(enumerate(train_dataloader))
+
+        for iteration, batch in t_range:
+            image, camera, camera_idx = batch[0].values()
+            image = image.cuda().unsqueeze(0)
+            camera = camera.cuda()
+
+            xy_grid = get_random_pixels_from_image(
+                cfg.training.batch_size, cfg.data.image_size, camera
+            )
+            ray_bundle = get_rays_from_pixels(
+                xy_grid, cfg.data.image_size, camera
+            )
+            rgb_gt = sample_images_at_xy(image, xy_grid)
+
+            out = model(ray_bundle)
+
+            loss = torch.mean(torch.square(rgb_gt - out['color']))
+            image_loss = loss
+
+            eikonal_points = get_random_points(
+                cfg.training.batch_size, cfg.training.bounds, 'cuda'
+            )
+
+            eikonal_distances, eikonal_gradients = model.implicit_fn.get_distance_and_gradient(eikonal_points)
+            loss += torch.exp(-1e2 * torch.abs(eikonal_distances)).mean() * cfg.training.inter_weight
+            loss += eikonal_loss(eikonal_gradients) * cfg.training.eikonal_weight
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            t_range.set_description(f'Epoch: {epoch:04d}, Loss: {image_loss:.06f}')
+            t_range.refresh()
+            
+        lr_scheduler.step()
+
+        if (
+            epoch % cfg.training.checkpoint_interval == 0
+            and len(cfg.training.checkpoint_path) > 0
+            and epoch > 0
+        ):
+            print(f"Storing checkpoint {checkpoint_path}.")
+
+            data_to_store = {
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "epoch": epoch,
+            }
+
+            torch.save(data_to_store, checkpoint_path)
+
+        if (
+            epoch % cfg.training.render_interval == 0
+            and epoch > 0
+        ):
+            os.makedirs("images/part_8_2", exist_ok=True)
+            test_images = render_images(
+                model, create_surround_cameras(4.0, n_poses=20, up=(0.0, 0.0, 1.0), focal_length=2.0),
+                cfg.data.image_size, file_prefix='images/part_8_2/volsdf_reduced'
+            )
+            imageio.mimsave('images/part_8_2/volsdf.gif', [np.uint8(im * 255) for im in test_images], loop=0)
+
+            try:
+                test_images = render_geometry(
+                    model, create_surround_cameras(4.0, n_poses=20, up=(0.0, 0.0, 1.0), focal_length=2.0),
+                    cfg.data.image_size, file_prefix='images/part_8_2/volsdf_geometry'
+                )
+                imageio.mimsave('images/part_8_2/volsdf_geometry.gif', [np.uint8(im * 255) for im in test_images], loop=0)
+            except Exception as e:
+                print("Empty mesh:", e)
+                pass
                 
 @hydra.main(config_path='configs', config_name='torus')
 def main(cfg: DictConfig):
@@ -427,6 +545,8 @@ def main(cfg: DictConfig):
         train_points(cfg)
     elif cfg.type == 'train_images':
         train_images(cfg)
+    elif cfg.type == 'train_images_reduced':
+        train_images_reduced(cfg)
 
 
 if __name__ == "__main__":
