@@ -1,0 +1,42 @@
+type: train_images_reduced
+data:
+  dataset_name: lego
+  image_size: [128, 128]
+  num_views: 20  # Reduced number of training views
+
+implicit_function:
+  type: neural_surface
+  n_harmonic_functions_xyz: 8
+  n_harmonic_functions_dir: 4
+  n_hidden_neurons_xyz: 256
+  n_hidden_neurons_dir: 128
+  n_layers: 8
+  
+sampler:
+  type: stratified
+  n_pts_per_ray: 128
+  min_depth: 2.0
+  max_depth: 6.0
+
+renderer:
+  type: volume_sdf
+  chunk_size: 4096
+  white_background: True
+  alpha: 10.0
+  beta: 0.05
+
+training:
+  num_epochs: 250
+  batch_size: 1024
+  lr: 0.0005
+  lr_scheduler_step_size: 50
+  lr_scheduler_gamma: 0.5
+  checkpoint_path: ./checkpoints/volsdf_reduced.pt
+  checkpoint_interval: 50
+  render_interval: 249
+  resume: False
+  bounds: [[-1.5, -1.5, -1.5], [1.5, 1.5, 1.5]]
+  eikonal_weight: 0.02
+  inter_weight: 0.1
+  pretrain_iters: 1000
+  fresh_start: True

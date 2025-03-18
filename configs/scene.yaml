@@ -1,0 +1,267 @@
+type: render
+data:
+  image_size: [800, 800]
+  
+output_name: part_8_1
+  
+implicit_function:
+  type: sdf_surface
+  sdf:
+    type: scene
+    center:
+      val: [0.0, 0.0, 0.0]
+      opt: false
+    smooth_factor: 0.1
+    primitives:
+      - type: box
+        center:
+          val: [0.0, -1.0, 0.0]
+          opt: false
+        side_lengths:
+          val: [20.0, 0.2, 20.0]
+          opt: false
+      
+      - type: box
+        center:
+          val: [0.0, -0.3, 0.0]
+          opt: false
+        side_lengths:
+          val: [2.0, 1.2, 2.0]
+          opt: false
+      
+      - type: torus
+        center:
+          val: [0.0, 0.6, 0.0]
+          opt: false
+        radii:
+          val: [1.0, 0.2]
+          opt: false
+          
+      - type: sphere
+        center:
+          val: [-0.9, 0.0, -0.9]
+          opt: false
+        radius:
+          val: 0.25
+          opt: false
+      - type: sphere
+        center:
+          val: [0.9, 0.0, -0.9]
+          opt: false
+        radius:
+          val: 0.25
+          opt: false
+      - type: sphere
+        center:
+          val: [-0.9, 0.0, 0.9]
+          opt: false
+        radius:
+          val: 0.25
+          opt: false
+      - type: sphere
+        center:
+          val: [0.9, 0.0, 0.9]
+          opt: false
+        radius:
+          val: 0.25
+          opt: false
+          
+      - type: torus
+        center:
+          val: [0.0, 0.6, 0.0]
+          opt: false
+        radii:
+          val: [1.5, 0.1]
+          opt: false
+          
+      - type: sphere
+        center:
+          val: [2.0, 0.3, 0.0]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+      - type: sphere
+        center:
+          val: [1.4, 0.3, 1.4]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+      - type: sphere
+        center:
+          val: [0.0, 0.3, 2.0]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+      - type: sphere
+        center:
+          val: [-1.4, 0.3, 1.4]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+      - type: sphere
+        center:
+          val: [-2.0, 0.3, 0.0]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+      - type: sphere
+        center:
+          val: [-1.4, 0.3, -1.4]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+      - type: sphere
+        center:
+          val: [0.0, 0.3, -2.0]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+      - type: sphere
+        center:
+          val: [1.4, 0.3, -1.4]
+          opt: false
+        radius:
+          val: 0.3
+          opt: false
+          
+      - type: box
+        center:
+          val: [-3.5, 0.5, 3.5]
+          opt: false
+        side_lengths:
+          val: [0.8, 3.0, 0.8]
+          opt: false
+      - type: box
+        center:
+          val: [-2.5, 0.3, 3.5]
+          opt: false
+        side_lengths:
+          val: [0.6, 2.5, 0.6]
+          opt: false
+      - type: box
+        center:
+          val: [-1.5, 0.1, 3.5]
+          opt: false
+        side_lengths:
+          val: [0.4, 2.0, 0.4]
+          opt: false
+      - type: box
+        center:
+          val: [1.5, 0.1, 3.5]
+          opt: false
+        side_lengths:
+          val: [0.4, 2.0, 0.4]
+          opt: false
+      - type: box
+        center:
+          val: [2.5, 0.3, 3.5]
+          opt: false
+        side_lengths:
+          val: [0.6, 2.5, 0.6]
+          opt: false
+      - type: box
+        center:
+          val: [3.5, 0.5, 3.5]
+          opt: false
+        side_lengths:
+          val: [0.8, 3.0, 0.8]
+          opt: false
+          
+      - type: box
+        center:
+          val: [-3.0, 2.0, 3.5]
+          opt: false
+        side_lengths:
+          val: [1.5, 0.3, 0.4]
+          opt: false
+      - type: box
+        center:
+          val: [-2.0, 1.5, 3.5]
+          opt: false
+        side_lengths:
+          val: [1.5, 0.3, 0.4]
+          opt: false
+      - type: box
+        center:
+          val: [2.0, 1.5, 3.5]
+          opt: false
+        side_lengths:
+          val: [1.5, 0.3, 0.4]
+          opt: false
+      - type: box
+        center:
+          val: [3.0, 2.0, 3.5]
+          opt: false
+        side_lengths:
+          val: [1.5, 0.3, 0.4]
+          opt: false
+          
+      - type: torus
+        center:
+          val: [-3.0, 0.3, -3.0]
+          opt: false
+        radii:
+          val: [0.5, 0.1]
+          opt: false
+      - type: torus
+        center:
+          val: [3.0, 0.3, -3.0]
+          opt: false
+        radii:
+          val: [0.5, 0.1]
+          opt: false
+      
+      - type: sphere
+        center:
+          val: [-4.0, -0.7, -4.0]
+          opt: false
+        radius:
+          val: 0.4
+          opt: false
+      - type: sphere
+        center:
+          val: [4.0, -0.7, -4.0]
+          opt: false
+        radius:
+          val: 0.4
+          opt: false
+      - type: sphere
+        center:
+          val: [-4.0, -0.7, 4.0]
+          opt: false
+        radius:
+          val: 0.4
+          opt: false
+      - type: sphere
+        center:
+          val: [4.0, -0.7, 4.0]
+          opt: false
+        radius:
+          val: 0.4
+          opt: false
+          
+  feature:
+    val: [[0.7, 0.5, 0.8]]
+    opt: true
+    rainbow: true
+
+sampler:
+  type: stratified
+  n_pts_per_ray: 128
+  min_depth: 0.0
+  max_depth: 10.0
+
+renderer:
+  type: sphere_tracing
+  chunk_size: 8192
+  near: 0.0
+  far: 10.0
+  max_iters: 150
+  convergence_threshold: 1e-4
