@@ -1,6 +1,19 @@
 # 16825: Learning For 3D Vision
 ## Project 3 Results - Vinayak Patel (vinayakp)
 
+------------------------------------------------------------------------------------------------------------------------------</br>
+### Navigating this repository
+<p>
+Relevant Files: </br> 
+./Assignment_README/README.md - Contains the original instructions for this assignment.</br>
+surface_rendering_main.py     - Main file for training, rendering and saving Neural Surfaces. </br>
+volume_rendering_main.py      - Main file for training, rendering and saving Volumes. </br>
+dataset.py                    - To download and save the necessary input dataset.</br>
+implicit.py                   - Contains the classes for NeRF, Neural Surface and Hierarchical NeRF (coarse and fine sampling).</br>
+renderer.py                   - To render Volume, Volume SDF and Sphere Tracing. </br>
+</p>
+------------------------------------------------------------------------------------------------------------------------------</br>
+
 ### A. Neural Volume Rendering
 ### 0. Transmittance Calcultion
 <p align="center">
